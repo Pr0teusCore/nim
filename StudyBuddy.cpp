@@ -5,6 +5,7 @@ const int DEFAULT_BUFLEN = 512;
 #include <string>
 #include <WinSock2.h>
 #include <ws2tcpip.h>
+#include <vector>
 #include "StudyBuddy.h"
 
 #pragma comment(lib, "Ws2_32.lib")
@@ -16,6 +17,7 @@ void joinStudyGroup();
 string getUserInput(const string& prompt);
 void sendMessage(SOCKET s, const char* message, sockaddr_in dest);
 string receiveMessage(SOCKET s, sockaddr_in& sender, int timeoutSeconds = 2);
+vector<int> translateMessage();
 
 int main() {
     WSADATA wsaData;
@@ -232,4 +234,28 @@ string receiveMessage(SOCKET s, sockaddr_in& sender, int timeoutSeconds) {
         return string(buf);
     }
     return "";
+}
+
+vector<int> translateMessage(char message[DEFAULT_BUFLEN]) {
+    char firstChar = message[0];
+    
+    if (fistChar == 'F') {
+        // You Win!
+    }
+    else if (fisrchar == 'C') {
+        // Print Chat Message
+        char chatMessage[DEFAULT_BUFLEN];
+        cout << "Chat: " << chatMessage << endl;
+    }
+    else if (isdigit(firstChar)) {
+        if (strlen(message) == 3) {
+            // Game Move
+        }
+        else if (strlen(message) > 3) {
+            // Game Board
+        }
+    }
+    else {
+        // You Win!
+    }
 }
