@@ -26,22 +26,22 @@ int main() {
 
     char choice;
     do {
-        cout << "Would you like to (H)ost or (J)oin a study group? (Q to quit): ";
+        cout << "Would you like to (H)ost a game or (C)hallenge another host? (Q to quit): ";
         cin >> choice;
         cin.ignore(numeric_limits<streamsize>::max(), '\n'); // Clear input buffer
 
         switch (toupper(choice)) {
         case 'H':
-            hostStudyGroup();
+            hostGame(); // TODO: change these function names later
             break;
-        case 'J':
-            joinStudyGroup();
+        case 'C':
+            joinGame();
             break;
         case 'Q':
             cout << "Quitting program." << endl;
             break;
         default:
-            cout << "Invalid choice. Please enter H, J, or Q." << endl;
+            cout << "Invalid choice. Please enter H, C, or Q." << endl;
         }
     } while (toupper(choice) != 'Q');
 
@@ -49,7 +49,7 @@ int main() {
     return 0;
 }
 
-void hostStudyGroup() {
+void hostGame() {
     SOCKET s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (s == INVALID_SOCKET) {
         cout << "Socket creation failed." << endl;
@@ -119,7 +119,7 @@ void hostStudyGroup() {
     closesocket(s);
 }
 
-void joinStudyGroup() {
+void joinGame() {
     SOCKET s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (s == INVALID_SOCKET) {
         cout << "Socket creation failed." << endl;
@@ -129,7 +129,13 @@ void joinStudyGroup() {
     BOOL bOptVal = TRUE;
     setsockopt(s, SOL_SOCKET, SO_BROADCAST, (char*)&bOptVal, sizeof(BOOL));
 
-    string clientName = getUserInput("Enter your name: ");
+    string clientName = getUserInput("Enter your name (no more than 80 characters): ");
+
+    while (clientName.length() > 80) {
+        cout << "Name entered exceeded 80 characters. Please enter a shorter name. " << endl;
+        clientName = getUserInput("Enter your name (no more than 80 characters): ");
+    }
+
     ServerStruct servers[MAX_SERVERS];
     int numServers = getServers(s, servers);
 
