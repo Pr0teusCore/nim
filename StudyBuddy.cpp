@@ -118,9 +118,14 @@ void hostStudyGroup() {
             else if (strncmp(recvBuf, Study_JOIN, strlen(Study_JOIN)) == 0) {
                 string newMember = string(recvBuf).substr(strlen(Study_JOIN));
                 if (!newMember.empty()) {
+                    string prompt = GetUserInput("You've received a request for a game, accept? Y/N");
+                    if (toUpper(prompt)=="Y"){
                     members += newMember + "\n";
                     sendMessage(s, Study_CONFIRM, sender);
                     cout << "Sent: " << Study_CONFIRM << " and added " << newMember << " to members." << endl;
+                    } else if (toUpper(prompt)=="N"){
+                        sendMessage(s, Study_DENY, sender);
+                    }
                 }
             }
         }
@@ -139,7 +144,7 @@ void joinStudyGroup() {
     BOOL bOptVal = TRUE;
     setsockopt(s, SOL_SOCKET, SO_BROADCAST, (char*)&bOptVal, sizeof(BOOL));
 
-    string clientName = getUserInput("Enter your name: ");
+    string clientName = Input("Enter your name: ");
     ServerStruct servers[MAX_SERVERS];
     int numServers = getServers(s, servers);
 
