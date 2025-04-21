@@ -17,7 +17,15 @@ void joinStudyGroup();
 string getUserInput(const string& prompt);
 void sendMessage(SOCKET s, const char* message, sockaddr_in dest);
 string receiveMessage(SOCKET s, sockaddr_in& sender, int timeoutSeconds = 2);
-vector<int> translateMessage();
+vector<int> translateMessage(char message[DEFAULT_BUFLEN], int gameBoard[]);
+    /*
+    * Return Value of translateMessage at index 0: 
+    * -2 -> Game Board Was Set Up
+    * -1 -> You Win By Default
+    *  0 -> Do Nothing (Chat Message)
+    * Other Number should be assumed to be the pile for the Opponent Move
+    * Index 1 should hold the number of rocks to be moved
+    */
 
 int main() {
     WSADATA wsaData;
@@ -236,26 +244,51 @@ string receiveMessage(SOCKET s, sockaddr_in& sender, int timeoutSeconds) {
     return "";
 }
 
-vector<int> translateMessage(char message[DEFAULT_BUFLEN]) {
+vector<int> translateMessage(char message[DEFAULT_BUFLEN], int gameBoard[]) {
     char firstChar = message[0];
-    
-    if (fistChar == 'F') {
+    vector<int> moveVector;
+
+    if (firstChar == 'F') {
         // You Win!
+        cout << "You Win!" << endl;
+        return { -1 };
     }
-    else if (fisrchar == 'C') {
+    else if (firstChar == 'C') {
         // Print Chat Message
         char chatMessage[DEFAULT_BUFLEN];
+        strncpy_s(chatMessage, message + 1, sizeof(chatMessage) - 1);
         cout << "Chat: " << chatMessage << endl;
+        return { 0 };
     }
     else if (isdigit(firstChar)) {
         if (strlen(message) == 3) {
             // Game Move
+            char temp[3];
+            strncpy_s(temp, message, 1);
+            moveVector.push_back(atoi(temp));
+            strncpy_s(temp, message + 1, 2);
+            moveVector.push_back(atoi(temp));
+            return moveVector;
         }
         else if (strlen(message) > 3) {
             // Game Board
+            char temp[3];
+            int j = 0;
+            int boardSize = firstChar - '0';
+            cout << "First Character: " << boardSize << endl;
+            for (int i = 1; i < boardSize * 2 + 1; i += 2) {
+                strncpy_s(temp, message + i, 2);
+                cout << "TEST " << temp << endl;
+                gameBoard[j] = atoi(temp);
+                j++;
+            }
+            return { -2, boardSize };
         }
     }
     else {
         // You Win!
+        cout << "You Win!" << endl;
+        return { -1 };
     }
+    return { 0 };
 }
