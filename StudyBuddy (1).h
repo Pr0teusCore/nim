@@ -6,15 +6,18 @@
 #define DEFAULT_BUFLEN   512
 #define DEFAULT_PORT     31100
 #define Study_QUERY      "Who?"
-#define Study_NAME	     "Name="
+#define Study_NAME	 "Name="
 #define Study_WHERE      "Where?"
-#define Study_LOC	     "Loc="
+#define Study_LOC	 "Loc="
 #define Study_WHAT       "What?"
 #define Study_COURSES    "Courses="
 #define Study_MEMBERS    "Members?"
 #define Study_MEMLIST    "Members="
 #define Study_JOIN       "Join="
-#define Study_CONFIRM    "Join!"
+#define Study_CONFIRM    "YES"
+#define Study_DENY    	 "NO"
+#define Study_CLIENTCONFIRM  "GREAT"
+
 
 struct ServerStruct {
 	char name[MAX_NAME];
