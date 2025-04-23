@@ -5,6 +5,7 @@ const int DEFAULT_BUFLEN = 512;
 #include <string>
 #include <WinSock2.h>
 #include <ws2tcpip.h>
+#include <vector>
 #include "StudyBuddy.h"
 
 #pragma comment(lib, "Ws2_32.lib")
@@ -16,6 +17,27 @@ void joinStudyGroup();
 string getUserInput(const string& prompt);
 void sendMessage(SOCKET s, const char* message, sockaddr_in dest);
 string receiveMessage(SOCKET s, sockaddr_in& sender, int timeoutSeconds = 2);
+bool modifyBoard(int gameBoard[], int boardSize, vector<int> playerMove);
+/*
+* Returns true if valid move
+* Returns false if invalid move
+*/
+vector<int> translateMessage(char message[DEFAULT_BUFLEN], int gameBoard[]);
+/*
+* Return Value of translateMessage at index 0:
+* -2 -> Game Board Was Set Up
+*       Index 1 will store the board size (Number of Piles)
+* -1 -> You Win By Default
+*  0 -> Do Nothing (Chat Message)
+* Other Number should be assumed to be the pile for the Opponent Move
+*       Index 1 should hold the number of rocks to be moved
+*/
+int determineWin(int gameBoard[], int boardSize, bool playerTurn);
+/*
+* Returns 1 if you win
+* Returns -1 if you lost
+* Returns 0 if game continues
+*/
 
 int main() {
     WSADATA wsaData;
@@ -26,22 +48,22 @@ int main() {
 
     char choice;
     do {
-        cout << "Would you like to (H)ost or (J)oin a study group? (Q to quit): ";
+        cout << "Would you like to (H)ost a game or (C)hallenge another host? (Q to quit): ";
         cin >> choice;
         cin.ignore(numeric_limits<streamsize>::max(), '\n'); // Clear input buffer
 
         switch (toupper(choice)) {
         case 'H':
-            hostStudyGroup();
+            hostGame(); // TODO: change these function names later
             break;
-        case 'J':
-            joinStudyGroup();
+        case 'C':
+            joinGame();
             break;
         case 'Q':
             cout << "Quitting program." << endl;
             break;
         default:
-            cout << "Invalid choice. Please enter H, J, or Q." << endl;
+            cout << "Invalid choice. Please enter H, C, or Q." << endl;
         }
     } while (toupper(choice) != 'Q');
 
@@ -49,7 +71,7 @@ int main() {
     return 0;
 }
 
-void hostStudyGroup() {
+void hostGame() {
     SOCKET s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (s == INVALID_SOCKET) {
         cout << "Socket creation failed." << endl;
@@ -108,9 +130,15 @@ void hostStudyGroup() {
             else if (strncmp(recvBuf, Study_JOIN, strlen(Study_JOIN)) == 0) {
                 string newMember = string(recvBuf).substr(strlen(Study_JOIN));
                 if (!newMember.empty()) {
-                    members += newMember + "\n";
-                    sendMessage(s, Study_CONFIRM, sender);
-                    cout << "Sent: " << Study_CONFIRM << " and added " << newMember << " to members." << endl;
+                    string prompt = GetUserInput("You've received a request for a game, accept? Y/N");
+                    if (toUpper(prompt) == "Y") {
+                        members += newMember + "\n";
+                        sendMessage(s, Study_CONFIRM, sender);
+                        cout << "Sent: " << Study_CONFIRM << " and added " << newMember << " to members." << endl;
+                    }
+                    else if (toUpper(prompt) == "N") {
+                        sendMessage(s, Study_DENY, sender);
+                    }
                 }
             }
         }
@@ -119,7 +147,7 @@ void hostStudyGroup() {
     closesocket(s);
 }
 
-void joinStudyGroup() {
+void joinGame() {
     SOCKET s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (s == INVALID_SOCKET) {
         cout << "Socket creation failed." << endl;
@@ -129,7 +157,13 @@ void joinStudyGroup() {
     BOOL bOptVal = TRUE;
     setsockopt(s, SOL_SOCKET, SO_BROADCAST, (char*)&bOptVal, sizeof(BOOL));
 
-    string clientName = getUserInput("Enter your name: ");
+    string clientName = getUserInput("Enter your name (no more than 80 characters): ");
+
+    while (clientName.length() > 80) {
+        cout << "Name entered exceeded 80 characters. Please enter a shorter name. " << endl;
+        clientName = getUserInput("Enter your name (no more than 80 characters): ");
+    }
+
     ServerStruct servers[MAX_SERVERS];
     int numServers = getServers(s, servers);
 
@@ -233,3 +267,80 @@ string receiveMessage(SOCKET s, sockaddr_in& sender, int timeoutSeconds) {
     }
     return "";
 }
+
+int modifyBoard(int gameBoard[], int boardSize, vector<int> playerMove) {
+    if (playerMove.at(0) <= 0 || playerMove.at(0) > boardSize) {
+        return false;
+    }
+    else if (playerMove.at(1) <= 0 || playerMove.at(1) > gameBoard[playerMove.at(0)]) {
+        return false;
+    }
+    else {
+        gameBoard[playerMove.at(0) - 1] -= playerMove.at(1);
+        return true;
+    }
+}
+
+vector<int> translateMessage(char message[DEFAULT_BUFLEN], int gameBoard[]) {
+    char firstChar = message[0];
+    vector<int> moveVector;
+
+    if (firstChar == 'F') {
+        // You Win!
+        cout << "You Win!" << endl;
+        return { -1 };
+    }
+    else if (firstChar == 'C') {
+        // Print Chat Message
+        char chatMessage[DEFAULT_BUFLEN];
+        strncpy_s(chatMessage, message + 1, sizeof(chatMessage) - 1);
+        cout << "Chat: " << chatMessage << endl;
+        return { 0 };
+    }
+    else if (isdigit(firstChar)) {
+        if (strlen(message) == 3) {
+            // Game Move
+            char temp[3];
+            strncpy_s(temp, message, 1);
+            moveVector.push_back(atoi(temp));
+            strncpy_s(temp, message + 1, 2);
+            moveVector.push_back(atoi(temp));
+            return moveVector;
+        }
+        else if (strlen(message) > 3) {
+            // Game Board
+            char temp[3];
+            int j = 0;
+            int boardSize = firstChar - '0';
+            cout << "First Character: " << boardSize << endl;
+            for (int i = 1; i < boardSize * 2 + 1; i += 2) {
+                strncpy_s(temp, message + i, 2);
+                cout << "TEST " << temp << endl;
+                gameBoard[j] = atoi(temp);
+                j++;
+            }
+            return { -2, boardSize };
+        }
+    }
+    else {
+        // You Win!
+        cout << "You Win!" << endl;
+        return { -1 };
+    }
+    return { 0 };
+}
+
+bool determineWin(int gameBoard[], int boardSize, bool playerTurn) {
+    for (int i = 0; i < boardSize; i++) {
+        if (gameBoard[i] > 0) {
+            return 0;
+        }
+    }
+    if (playerTurn) {
+        return 1;
+    }
+    else {
+        return -1;
+    }
+}
+
