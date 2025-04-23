@@ -17,14 +17,26 @@ void joinStudyGroup();
 string getUserInput(const string& prompt);
 void sendMessage(SOCKET s, const char* message, sockaddr_in dest);
 string receiveMessage(SOCKET s, sockaddr_in& sender, int timeoutSeconds = 2);
+bool modifyBoard(int gameBoard[], int boardSize, vector<int> playerMove);
+    /*
+    * Returns true if valid move
+    * Returns false if invalid move
+    */
 vector<int> translateMessage(char message[DEFAULT_BUFLEN], int gameBoard[]);
     /*
     * Return Value of translateMessage at index 0: 
     * -2 -> Game Board Was Set Up
+    *       Index 1 will store the board size (Number of Piles)
     * -1 -> You Win By Default
     *  0 -> Do Nothing (Chat Message)
     * Other Number should be assumed to be the pile for the Opponent Move
-    * Index 1 should hold the number of rocks to be moved
+    *       Index 1 should hold the number of rocks to be moved
+    */
+int determineWin(int gameBoard[], int boardSize, bool playerTurn);
+    /*
+    * Returns 1 if you win
+    * Returns -1 if you lost
+    * Returns 0 if game continues
     */
 
 int main() {
@@ -244,6 +256,19 @@ string receiveMessage(SOCKET s, sockaddr_in& sender, int timeoutSeconds) {
     return "";
 }
 
+int modifyBoard(int gameBoard[], int boardSize, vector<int> playerMove) {
+    if (playerMove.at(0) <= 0 || playerMove.at(0) > boardSize) {
+        return false;
+    }
+    else if (playerMove.at(1) <= 0 || playerMove.at(1) > gameBoard[playerMove.at(0)]) {
+        return false;
+    }
+    else {
+        gameBoard[playerMove.at(0) - 1] -= playerMove.at(1);
+        return true;
+    }
+}
+
 vector<int> translateMessage(char message[DEFAULT_BUFLEN], int gameBoard[]) {
     char firstChar = message[0];
     vector<int> moveVector;
@@ -291,4 +316,18 @@ vector<int> translateMessage(char message[DEFAULT_BUFLEN], int gameBoard[]) {
         return { -1 };
     }
     return { 0 };
+}
+
+bool determineWin(int gameBoard[], int boardSize, bool playerTurn) {
+    for (int i = 0; i < boardSize; i++) {
+        if (gameBoard[i] > 0) {
+            return 0;
+        }
+    }
+    if (playerTurn) {
+        return 1;
+    }
+    else {
+        return -1;
+    }
 }
