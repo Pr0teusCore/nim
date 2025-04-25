@@ -13,9 +13,12 @@
 #define Study_COURSES    "Courses="
 #define Study_MEMBERS    "Members?"
 #define Study_MEMLIST    "Members="
-#define Study_JOIN       "Player="
 #define Study_CONFIRM    "YES"
 #define Study_DENY       "NO"
+#define TIMEOUT_SECONDS 30
+#define DISCOVERY_TIMEOUT 2
+#define CHALLENGE_TIMEOUT 10
+#define GREAT_TIMEOUT 2
 
 struct ServerStruct {
 	char name[MAX_NAME];

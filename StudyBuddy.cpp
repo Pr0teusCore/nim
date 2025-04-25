@@ -5,20 +5,13 @@
 #include <string>
 #include <vector>
 #include <limits>
+#include <algorithm>
+#include <StudyBuddy.h>
 
 #pragma comment(lib, "Ws2_32.lib")
 #pragma comment(lib, "iphlpapi.lib")
 
-#define PORT 29333
-#define MAX_BUFFER 81
-#define TIMEOUT_SECONDS 30
-#define DISCOVERY_TIMEOUT 2
-#define CHALLENGE_TIMEOUT 10
-#define GREAT_TIMEOUT 2
-#define MAX_SERVERS 100
-#define QUERY "Who?"
-#define NAME_PREFIX "Name="
-#define PLAYER_PREFIX "Player="
+
 
 struct ServerStruct {
     char name[MAX_BUFFER];
