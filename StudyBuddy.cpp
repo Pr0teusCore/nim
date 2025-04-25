@@ -213,13 +213,13 @@ bool serverNegotiate(SOCKET s, const std::string& serverName, GameState& game, s
                         if (response == "GREAT!") {
                             int piles;
                             do {
-                                std::cout << "Number of piles (3-9): ";
+                                std::cout << "Enter number of piles (3-9): ";
                                 std::cin >> piles;
                             } while (piles < 3 || piles > 9);
                             game.piles.resize(piles);
                             for (int i = 0; i < piles; i++) {
                                 do {
-                                    std::cout << "Rocks for pile " << i + 1 << " (1-20): ";
+                                    std::cout << "Enter rocks for pile " << i + 1 << " (1-20): ";
                                     std::cin >> game.piles[i];
                                 } while (game.piles[i] < 1 || game.piles[i] > 20);
                             }
@@ -257,13 +257,13 @@ std::string getMove(const GameState& game) {
     int pile, rocks;
     do {
         displayBoard(game);
-        std::cout << "Pile (1-" << game.piles.size() << "): ";
+        std::cout << "Enter Pile to Take From (1-" << game.piles.size() << "): ";
         std::cin >> pile;
         if (pile < 1 || pile >(int)game.piles.size() || game.piles[pile - 1] == 0) {
             std::cout << "Invalid pile.\n";
             continue;
         }
-        std::cout << "Rocks (1-" << game.piles[pile - 1] << "): ";
+        std::cout << "Enter Number of Rocks to Take (1-" << game.piles[pile - 1] << "): ";
         std::cin >> rocks;
         if (rocks < 1 || rocks > game.piles[pile - 1]) {
             std::cout << "Invalid rocks.\n";
@@ -277,7 +277,7 @@ std::string getMove(const GameState& game) {
 void playGame(SOCKET s, GameState& game, sockaddr_in& opponentAddr) {
     while (!isGameOver(game)) {
         if (game.myTurn) {
-            std::cout << "1. Move\n2. Chat\n3. Forfeit\nChoice: ";
+            std::cout << "1. Move\n2. Chat\n3. Forfeit\nEnter Number: ";
             int choice;
             std::cin >> choice;
             std::cin.ignore();
@@ -289,7 +289,7 @@ void playGame(SOCKET s, GameState& game, sockaddr_in& opponentAddr) {
                 game.piles[pile] -= rocks;
             }
             else if (choice == 2) {
-                std::cout << "Message (max 80 chars): ";
+                std::cout << "Enter Message (max 80 chars): ";
                 std::getline(std::cin, msg);
                 msg = "C" + (msg.length() > 80 ? msg.substr(0, 80) : msg);
             }
