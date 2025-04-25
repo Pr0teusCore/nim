@@ -50,8 +50,7 @@ int main() {
     do {
         cout << "Would you like to (H)ost a game or (C)hallenge another host? (Q to quit): ";
         cin >> choice;
-        cin.ignore(numeric_limits<streamsize>::max(), '\n'); // Clear input buffer
-
+       
         switch (toupper(choice)) {
         case 'H':
             hostGame(); // TODO: change these function names later
@@ -182,14 +181,14 @@ void joinGame() {
     do {
         cout << "Choose an action:\n1. Ask location\n2. Ask courses\n3. Ask members\n4. Join group\n5. Exit\nChoice: ";
         cin >> choice;
-        cin.ignore(numeric_limits<streamsize>::max(), '\n');
+        cin.ignore();
 
         if (choice >= '1' && choice <= '5') {
             int serverIndex;
             if (choice != '5') {
                 cout << "Select a study group (1-" << numServers << "): ";
                 cin >> serverIndex;
-                cin.ignore(numeric_limits<streamsize>::max(), '\n');
+                cin.ignore();
                 serverIndex--; // Convert to 0-based
                 if (serverIndex < 0 || serverIndex >= numServers) {
                     cout << "Invalid selection." << endl;
@@ -199,7 +198,7 @@ void joinGame() {
 
             sockaddr_in serverAddr = servers[serverIndex].addr;
             string response;
-
+            string joinMsg;
             switch (choice) {
             case '1': // Ask location
                 sendMessage(s, Study_WHERE, serverAddr);
@@ -223,7 +222,7 @@ void joinGame() {
                 }
                 break;
             case '4': // Join group
-                string joinMsg = string(Study_JOIN) + clientName;
+                joinMsg = string(Study_JOIN) + clientName;
                 sendMessage(s, joinMsg.c_str(), serverAddr);
                 response = receiveMessage(s, serverAddr);
                 if (response == Study_CONFIRM) {
