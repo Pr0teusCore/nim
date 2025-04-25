@@ -7,22 +7,12 @@
 #include <limits>
 #include <algorithm>
 #include <StudyBuddy.h>
+#include <Utilities.cpp>
 
 #pragma comment(lib, "Ws2_32.lib")
 #pragma comment(lib, "iphlpapi.lib")
 
 
-
-struct ServerStruct {
-    char name[MAX_BUFFER];
-    sockaddr_in addr;
-};
-
-struct GameState {
-    std::vector<int> piles;
-    bool myTurn;
-    std::string opponentName;
-};
 
 // Winsock Initialization
 void initializeWinsock() {
@@ -90,7 +80,7 @@ sockaddr_in GetBroadcastAddress() {
         inet_pton(AF_INET, pAdapterInfo->IpAddressList.IpMask.String, &mask);
         unsigned long bcast = ip | (mask ^ 0xffffffff);
         addr.sin_family = AF_INET;
-        addr.sin_port = htons(PORT);
+        addr.sin_port = htons(DEFAULT_PORT);
         addr.sin_addr.s_addr = bcast;
     }
     if (pAdapterInfo) HeapFree(GetProcessHeap(), 0, pAdapterInfo);
@@ -200,7 +190,7 @@ bool clientNegotiate(SOCKET s, const std::string& clientName, GameState& game, s
 
 // Server Negotiation
 bool serverNegotiate(SOCKET s, const std::string& serverName, GameState& game, sockaddr_in& clientAddr) {
-    bindSocket(s, PORT);
+    bindSocket(s, DEFAULT_PORT);
     while (true) {
         char buf[MAX_BUFFER];
         int addrSize = sizeof(clientAddr);
