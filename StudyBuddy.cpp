@@ -1,345 +1,385 @@
-#pragma comment(lib, "Ws2_32.lib")
-const int DEFAULT_BUFLEN = 512;
-
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#include <iphlpapi.h>
 #include <iostream>
 #include <string>
-#include <WinSock2.h>
-#include <ws2tcpip.h>
 #include <vector>
-#include "StudyBuddy.h"
+#include <limits>
 
 #pragma comment(lib, "Ws2_32.lib")
+#pragma comment(lib, "iphlpapi.lib")
 
-using namespace std;
+#define PORT 29333
+#define MAX_BUFFER 81
+#define TIMEOUT_SECONDS 30
+#define DISCOVERY_TIMEOUT 2
+#define CHALLENGE_TIMEOUT 10
+#define GREAT_TIMEOUT 2
+#define MAX_SERVERS 100
+#define QUERY "Who?"
+#define NAME_PREFIX "Name="
+#define PLAYER_PREFIX "Player="
 
-void hostStudyGroup();
-void joinStudyGroup();
-string getUserInput(const string& prompt);
-void sendMessage(SOCKET s, const char* message, sockaddr_in dest);
-string receiveMessage(SOCKET s, sockaddr_in& sender, int timeoutSeconds = 2);
-bool modifyBoard(int gameBoard[], int boardSize, vector<int> playerMove);
-/*
-* Returns true if valid move
-* Returns false if invalid move
-*/
-vector<int> translateMessage(char message[DEFAULT_BUFLEN], int gameBoard[]);
-/*
-* Return Value of translateMessage at index 0:
-* -2 -> Game Board Was Set Up
-*       Index 1 will store the board size (Number of Piles)
-* -1 -> You Win By Default
-*  0 -> Do Nothing (Chat Message)
-* Other Number should be assumed to be the pile for the Opponent Move
-*       Index 1 should hold the number of rocks to be moved
-*/
-int determineWin(int gameBoard[], int boardSize, bool playerTurn);
-/*
-* Returns 1 if you win
-* Returns -1 if you lost
-* Returns 0 if game continues
-*/
+struct ServerStruct {
+    char name[MAX_BUFFER];
+    sockaddr_in addr;
+};
 
-int main() {
+struct GameState {
+    std::vector<int> piles;
+    bool myTurn;
+    std::string opponentName;
+};
+
+// Winsock Initialization
+void initializeWinsock() {
     WSADATA wsaData;
     if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
-        cout << "WSAStartup failed." << endl;
-        return 1;
+        std::cout << "WSAStartup failed: " << WSAGetLastError() << std::endl;
+        exit(1);
     }
-
-    char choice;
-    do {
-        cout << "Would you like to (H)ost a game or (C)hallenge another host? (Q to quit): ";
-        cin >> choice;
-       
-        switch (toupper(choice)) {
-        case 'H':
-            hostGame(); // TODO: change these function names later
-            break;
-        case 'C':
-            joinGame();
-            break;
-        case 'Q':
-            cout << "Quitting program." << endl;
-            break;
-        default:
-            cout << "Invalid choice. Please enter H, C, or Q." << endl;
-        }
-    } while (toupper(choice) != 'Q');
-
-    WSACleanup();
-    return 0;
 }
 
-void hostGame() {
+// Socket Creation
+SOCKET createUdpSocket() {
     SOCKET s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (s == INVALID_SOCKET) {
-        cout << "Socket creation failed." << endl;
-        return;
+        std::cout << "Socket creation failed: " << WSAGetLastError() << std::endl;
+        WSACleanup();
+        exit(1);
     }
+    return s;
+}
 
-    sockaddr_in serverAddr{};
-    serverAddr.sin_family = AF_INET;
-    serverAddr.sin_port = htons(DEFAULT_PORT);
-    serverAddr.sin_addr.S_un.S_addr = INADDR_ANY;
-
-    if (bind(s, (sockaddr*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR) {
-        cout << "Bind failed." << endl;
+// Bind Socket
+void bindSocket(SOCKET s, int port) {
+    sockaddr_in addr;
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(port);
+    addr.sin_addr.s_addr = INADDR_ANY;
+    if (bind(s, (sockaddr*)&addr, sizeof(addr)) == SOCKET_ERROR) {
+        std::cout << "Bind failed: " << WSAGetLastError() << std::endl;
         closesocket(s);
-        return;
+        WSACleanup();
+        exit(1);
     }
-
-    string groupName = getUserInput("Enter the name of the study group: ");
-    string hostName = getUserInput("Enter your name (optional, press Enter to skip): ");
-    string location = getUserInput("Enter the location of the study group: ");
-    string courses = getUserInput("Enter the courses (PREFIX XXXX, newline separated): ");
-    string members = hostName.empty() ? "" : hostName + "\n";
-
-    cout << "Hosting study group: " << groupName << " at " << location << " for " << courses << endl;
-    cout << "Waiting for queries..." << endl;
-
-    char recvBuf[DEFAULT_BUFLEN];
-    while (true) {
-        sockaddr_in sender{};
-        int senderLen = sizeof(sender);
-        int len = recvfrom(s, recvBuf, DEFAULT_BUFLEN, 0, (sockaddr*)&sender, &senderLen);
-        if (len > 0) {
-            recvBuf[len] = '\0';
-            cout << "Received: " << recvBuf << endl;
-
-            if (strcmp(recvBuf, Study_QUERY) == 0) {
-                string response = string(Study_NAME) + groupName;
-                sendMessage(s, response.c_str(), sender);
-                cout << "Sent: " << response << endl;
-            }
-            else if (strcmp(recvBuf, Study_WHERE) == 0) {
-                string response = string(Study_LOC) + location;
-                sendMessage(s, response.c_str(), sender);
-                cout << "Sent: " << response << endl;
-            }
-            else if (strcmp(recvBuf, Study_WHAT) == 0) {
-                string response = string(Study_COURSES) + courses;
-                sendMessage(s, response.c_str(), sender);
-                cout << "Sent: " << response << endl;
-            }
-            else if (strcmp(recvBuf, Study_MEMBERS) == 0) {
-                string response = string(Study_MEMLIST) + members;
-                sendMessage(s, response.c_str(), sender);
-                cout << "Sent: " << response << endl;
-            }
-            else if (strncmp(recvBuf, Study_JOIN, strlen(Study_JOIN)) == 0) {
-                string newMember = string(recvBuf).substr(strlen(Study_JOIN));
-                if (!newMember.empty()) {
-                    string prompt = GetUserInput("You've received a request for a game, accept? Y/N");
-                    if (toUpper(prompt) == "Y") {
-                        members += newMember + "\n";
-                        sendMessage(s, Study_CONFIRM, sender);
-                        cout << "Sent: " << Study_CONFIRM << " and added " << newMember << " to members." << endl;
-                    }
-                    else if (toUpper(prompt) == "N") {
-                        sendMessage(s, Study_DENY, sender);
-                    }
-                }
-            }
-        }
-    }
-
-    closesocket(s);
 }
 
-void joinGame() {
-    SOCKET s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-    if (s == INVALID_SOCKET) {
-        cout << "Socket creation failed." << endl;
-        return;
+// Wait Function (Adapted from StudyBuddy)
+int wait(SOCKET s, int seconds, int msec) {
+    struct timeval timeout;
+    timeout.tv_sec = seconds;
+    timeout.tv_usec = msec * 1000;
+    fd_set readFDS, xcptFDS;
+    FD_ZERO(&readFDS);
+    FD_ZERO(&xcptFDS);
+    FD_SET(s, &readFDS);
+    FD_SET(s, &xcptFDS);
+    int stat = select(0, &readFDS, NULL, &xcptFDS, &timeout);
+    if (stat == SOCKET_ERROR || (stat > 0 && (FD_ISSET(s, &xcptFDS) || !FD_ISSET(s, &readFDS)))) {
+        return 0;
     }
+    return stat;
+}
 
+// Get Broadcast Address (Adapted from StudyBuddy)
+sockaddr_in GetBroadcastAddress() {
+    PIP_ADAPTER_INFO pAdapterInfo = (IP_ADAPTER_INFO*)HeapAlloc(GetProcessHeap(), 0, sizeof(IP_ADAPTER_INFO));
+    ULONG ulOutBufLen = sizeof(IP_ADAPTER_INFO);
+    if (GetAdaptersInfo(pAdapterInfo, &ulOutBufLen) == ERROR_BUFFER_OVERFLOW) {
+        HeapFree(GetProcessHeap(), 0, pAdapterInfo);
+        pAdapterInfo = (IP_ADAPTER_INFO*)HeapAlloc(GetProcessHeap(), 0, ulOutBufLen);
+    }
+    sockaddr_in addr{};
+    if (GetAdaptersInfo(pAdapterInfo, &ulOutBufLen) == NO_ERROR && pAdapterInfo) {
+        unsigned long ip, mask;
+        inet_pton(AF_INET, pAdapterInfo->IpAddressList.IpAddress.String, &ip);
+        inet_pton(AF_INET, pAdapterInfo->IpAddressList.IpMask.String, &mask);
+        unsigned long bcast = ip | (mask ^ 0xffffffff);
+        addr.sin_family = AF_INET;
+        addr.sin_port = htons(PORT);
+        addr.sin_addr.s_addr = bcast;
+    }
+    if (pAdapterInfo) HeapFree(GetProcessHeap(), 0, pAdapterInfo);
+    return addr.sin_addr.s_addr == INADDR_ANY ? addr : addr; // Fallback to 255.255.255.255 if needed
+}
+
+// Discover Servers (Adapted from StudyBuddy)
+int getServers(SOCKET s, ServerStruct servers[]) {
+    int numServers = 0;
     BOOL bOptVal = TRUE;
     setsockopt(s, SOL_SOCKET, SO_BROADCAST, (char*)&bOptVal, sizeof(BOOL));
-
-    string clientName = getUserInput("Enter your name (no more than 80 characters): ");
-
-    while (clientName.length() > 80) {
-        cout << "Name entered exceeded 80 characters. Please enter a shorter name. " << endl;
-        clientName = getUserInput("Enter your name (no more than 80 characters): ");
-    }
-
-    ServerStruct servers[MAX_SERVERS];
-    int numServers = getServers(s, servers);
-
-    if (numServers == 0) {
-        cout << "No study groups found." << endl;
-        closesocket(s);
-        return;
-    }
-
-    cout << "Available study groups:" << endl;
-    for (int i = 0; i < numServers; i++) {
-        cout << i + 1 << ". " << servers[i].name << endl;
-    }
-
-    char choice;
-    do {
-        cout << "Choose an action:\n1. Ask location\n2. Ask courses\n3. Ask members\n4. Join group\n5. Exit\nChoice: ";
-        cin >> choice;
-        cin.ignore();
-
-        if (choice >= '1' && choice <= '5') {
-            int serverIndex;
-            if (choice != '5') {
-                cout << "Select a study group (1-" << numServers << "): ";
-                cin >> serverIndex;
-                cin.ignore();
-                serverIndex--; // Convert to 0-based
-                if (serverIndex < 0 || serverIndex >= numServers) {
-                    cout << "Invalid selection." << endl;
-                    continue;
-                }
-            }
-
-            sockaddr_in serverAddr = servers[serverIndex].addr;
-            string response;
-            string joinMsg;
-            switch (choice) {
-            case '1': // Ask location
-                sendMessage(s, Study_WHERE, serverAddr);
-                response = receiveMessage(s, serverAddr);
-                if (!response.empty() && strncmp(response.c_str(), Study_LOC, strlen(Study_LOC)) == 0) {
-                    cout << "Location: " << response.substr(strlen(Study_LOC)) << endl;
-                }
-                break;
-            case '2': // Ask courses
-                sendMessage(s, Study_WHAT, serverAddr);
-                response = receiveMessage(s, serverAddr);
-                if (!response.empty() && strncmp(response.c_str(), Study_COURSES, strlen(Study_COURSES)) == 0) {
-                    cout << "Courses: " << response.substr(strlen(Study_COURSES)) << endl;
-                }
-                break;
-            case '3': // Ask members
-                sendMessage(s, Study_MEMBERS, serverAddr);
-                response = receiveMessage(s, serverAddr);
-                if (!response.empty() && strncmp(response.c_str(), Study_MEMLIST, strlen(Study_MEMLIST)) == 0) {
-                    cout << "Members: " << response.substr(strlen(Study_MEMLIST)) << endl;
-                }
-                break;
-            case '4': // Join group
-                joinMsg = string(Study_JOIN) + clientName;
-                sendMessage(s, joinMsg.c_str(), serverAddr);
-                response = receiveMessage(s, serverAddr);
-                if (response == Study_CONFIRM) {
-                    cout << "Successfully joined the study group!" << endl;
-                    closesocket(s);
-                    return; // Exit after joining
-                }
-                break;
-            case '5': // Exit
-                break;
-            }
+    sockaddr_in broadcastAddr = GetBroadcastAddress();
+    sendto(s, QUERY, strlen(QUERY) + 1, 0, (sockaddr*)&broadcastAddr, sizeof(broadcastAddr));
+    char recvBuf[MAX_BUFFER];
+    int status = wait(s, DISCOVERY_TIMEOUT, 0);
+    while (status > 0) {
+        sockaddr_in addr;
+        int addrSize = sizeof(addr);
+        int len = recvfrom(s, recvBuf, MAX_BUFFER, 0, (sockaddr*)&addr, &addrSize);
+        if (len > 0 && strncmp(recvBuf, NAME_PREFIX, 5) == 0) {
+            strncpy(servers[numServers].name, recvBuf + 5, MAX_BUFFER - 5);
+            servers[numServers].name[MAX_BUFFER - 5] = '\0';
+            servers[numServers].addr = addr;
+            numServers++;
         }
-        else {
-            cout << "Invalid choice. Please enter 1-5." << endl;
-        }
-    } while (choice != '5');
-
-    closesocket(s);
+        status = wait(s, 0, 100); // Short wait for additional responses
+    }
+    return numServers;
 }
 
-string getUserInput(const string& prompt) {
-    string input;
-    cout << prompt;
-    getline(cin, input);
-    return input;
+// Send Message
+void sendMessage(SOCKET s, const std::string& message, sockaddr_in dest) {
+    sendto(s, message.c_str(), message.length() + 1, 0, (sockaddr*)&dest, sizeof(dest));
 }
 
-void sendMessage(SOCKET s, const char* message, sockaddr_in dest) {
-    sendto(s, message, strlen(message) + 1, 0, (sockaddr*)&dest, sizeof(dest));
-    cout << "Sent: " << message << endl;
-}
-
-string receiveMessage(SOCKET s, sockaddr_in& sender, int timeoutSeconds) {
-    char buf[DEFAULT_BUFLEN];
+// Receive Message
+std::string receiveMessage(SOCKET s, sockaddr_in& sender, int seconds = TIMEOUT_SECONDS) {
+    char buf[MAX_BUFFER];
     int senderLen = sizeof(sender);
-    int len = recvfrom(s, buf, DEFAULT_BUFLEN, 0, (sockaddr*)&sender, &senderLen);
-    if (len > 0) {
-        buf[len] = '\0';
-        cout << "Received: " << buf << endl;
-        return string(buf);
+    if (wait(s, seconds, 0) > 0) {
+        int len = recvfrom(s, buf, MAX_BUFFER, 0, (sockaddr*)&sender, &senderLen);
+        if (len > 0) {
+            buf[len] = '\0';
+            return std::string(buf);
+        }
     }
     return "";
 }
 
-int modifyBoard(int gameBoard[], int boardSize, vector<int> playerMove) {
-    if (playerMove.at(0) <= 0 || playerMove.at(0) > boardSize) {
+// User Input Functions
+std::string getUserName() {
+    std::cout << "Enter your name (max 80 chars): ";
+    std::string name;
+    std::getline(std::cin, name);
+    return name.length() > 80 ? name.substr(0, 80) : name;
+}
+
+char getModeChoice() {
+    std::cout << "Would you like to (H)ost or (C)hallenge a game? (Q to quit): ";
+    char choice;
+    std::cin >> choice;
+    return toupper(choice);
+}
+
+// Client Negotiation
+bool clientNegotiate(SOCKET s, const std::string& clientName, GameState& game, sockaddr_in& serverAddr) {
+    ServerStruct servers[MAX_SERVERS];
+    int numServers = getServers(s, servers);
+    if (numServers == 0) {
+        std::cout << "No servers found.\n";
         return false;
     }
-    else if (playerMove.at(1) <= 0 || playerMove.at(1) > gameBoard[playerMove.at(0)]) {
-        return false;
+    std::cout << "Available servers:\n";
+    for (int i = 0; i < numServers; i++) {
+        std::cout << i + 1 << ". " << servers[i].name << "\n";
     }
-    else {
-        gameBoard[playerMove.at(0) - 1] -= playerMove.at(1);
+    std::cout << "Select a server (1-" << numServers << "): ";
+    int choice;
+    std::cin >> choice;
+    std::cin.ignore();
+    if (choice < 1 || choice > numServers) return false;
+    serverAddr = servers[choice - 1].addr;
+    game.opponentName = servers[choice - 1].name;
+
+    std::string challenge = PLAYER_PREFIX + clientName;
+    sendMessage(s, challenge, serverAddr);
+    std::string response = receiveMessage(s, serverAddr, CHALLENGE_TIMEOUT);
+    if (response == "YES") {
+        sendMessage(s, "GREAT!", serverAddr);
+        std::string board = receiveMessage(s, serverAddr);
+        if (board.empty() || board[0] < '3' || board[0] > '9' || board.length() != (board[0] - '0') * 2 + 1) {
+            std::cout << "Game over: Invalid/no board received. You win.\n";
+            return false;
+        }
+        game.piles.clear();
+        for (size_t i = 1; i < board.length(); i += 2) {
+            int rocks = std::stoi(board.substr(i, 2));
+            if (rocks < 1 || rocks > 20) return false;
+            game.piles.push_back(rocks);
+        }
+        game.myTurn = true;
         return true;
     }
+    std::cout << game.opponentName << " refused the challenge.\n";
+    return false;
 }
 
-vector<int> translateMessage(char message[DEFAULT_BUFLEN], int gameBoard[]) {
-    char firstChar = message[0];
-    vector<int> moveVector;
-
-    if (firstChar == 'F') {
-        // You Win!
-        cout << "You Win!" << endl;
-        return { -1 };
-    }
-    else if (firstChar == 'C') {
-        // Print Chat Message
-        char chatMessage[DEFAULT_BUFLEN];
-        strncpy_s(chatMessage, message + 1, sizeof(chatMessage) - 1);
-        cout << "Chat: " << chatMessage << endl;
-        return { 0 };
-    }
-    else if (isdigit(firstChar)) {
-        if (strlen(message) == 3) {
-            // Game Move
-            char temp[3];
-            strncpy_s(temp, message, 1);
-            moveVector.push_back(atoi(temp));
-            strncpy_s(temp, message + 1, 2);
-            moveVector.push_back(atoi(temp));
-            return moveVector;
-        }
-        else if (strlen(message) > 3) {
-            // Game Board
-            char temp[3];
-            int j = 0;
-            int boardSize = firstChar - '0';
-            cout << "First Character: " << boardSize << endl;
-            for (int i = 1; i < boardSize * 2 + 1; i += 2) {
-                strncpy_s(temp, message + i, 2);
-                cout << "TEST " << temp << endl;
-                gameBoard[j] = atoi(temp);
-                j++;
+// Server Negotiation
+bool serverNegotiate(SOCKET s, const std::string& serverName, GameState& game, sockaddr_in& clientAddr) {
+    bindSocket(s, PORT);
+    while (true) {
+        char buf[MAX_BUFFER];
+        int addrSize = sizeof(clientAddr);
+        if (wait(s, TIMEOUT_SECONDS, 0) > 0) {
+            int len = recvfrom(s, buf, MAX_BUFFER, 0, (sockaddr*)&clientAddr, &addrSize);
+            if (len > 0) {
+                buf[len] = '\0';
+                if (strcmp(buf, QUERY) == 0) {
+                    std::string response = NAME_PREFIX + serverName;
+                    sendMessage(s, response, clientAddr);
+                }
+                else if (strncmp(buf, PLAYER_PREFIX, 7) == 0) {
+                    game.opponentName = std::string(buf + 7);
+                    std::cout << "Challenged by " << game.opponentName << ". Accept? (y/n): ";
+                    std::string choice;
+                    std::getline(std::cin, choice);
+                    if (choice == "y" || choice == "Y") {
+                        sendMessage(s, "YES", clientAddr);
+                        std::string response = receiveMessage(s, clientAddr, GREAT_TIMEOUT);
+                        if (response == "GREAT!") {
+                            int piles;
+                            do {
+                                std::cout << "Number of piles (3-9): ";
+                                std::cin >> piles;
+                            } while (piles < 3 || piles > 9);
+                            game.piles.resize(piles);
+                            for (int i = 0; i < piles; i++) {
+                                do {
+                                    std::cout << "Rocks for pile " << i + 1 << " (1-20): ";
+                                    std::cin >> game.piles[i];
+                                } while (game.piles[i] < 1 || game.piles[i] > 20);
+                            }
+                            std::cin.ignore();
+                            std::string board = std::to_string(piles);
+                            for (int r : game.piles) board += (r < 10 ? "0" + std::to_string(r) : std::to_string(r));
+                            sendMessage(s, board, clientAddr);
+                            game.myTurn = false;
+                            return true;
+                        }
+                    }
+                    else {
+                        sendMessage(s, "NO", clientAddr);
+                    }
+                }
             }
-            return { -2, boardSize };
         }
     }
-    else {
-        // You Win!
-        cout << "You Win!" << endl;
-        return { -1 };
-    }
-    return { 0 };
+    return false;
 }
 
-bool determineWin(int gameBoard[], int boardSize, bool playerTurn) {
-    for (int i = 0; i < boardSize; i++) {
-        if (gameBoard[i] > 0) {
-            return 0;
-        }
-    }
-    if (playerTurn) {
-        return 1;
-    }
-    else {
-        return -1;
+// Game Logic
+void displayBoard(const GameState& game) {
+    std::cout << "Board:\n";
+    for (size_t i = 0; i < game.piles.size(); i++) {
+        std::cout << "Pile " << i + 1 << ": " << game.piles[i] << "\n";
     }
 }
 
+bool isGameOver(const GameState& game) {
+    return std::all_of(game.piles.begin(), game.piles.end(), [](int r) { return r == 0; });
+}
+
+std::string getMove(const GameState& game) {
+    int pile, rocks;
+    do {
+        displayBoard(game);
+        std::cout << "Pile (1-" << game.piles.size() << "): ";
+        std::cin >> pile;
+        if (pile < 1 || pile >(int)game.piles.size() || game.piles[pile - 1] == 0) {
+            std::cout << "Invalid pile.\n";
+            continue;
+        }
+        std::cout << "Rocks (1-" << game.piles[pile - 1] << "): ";
+        std::cin >> rocks;
+        if (rocks < 1 || rocks > game.piles[pile - 1]) {
+            std::cout << "Invalid rocks.\n";
+        }
+        else break;
+    } while (true);
+    std::cin.ignore();
+    return std::to_string(pile) + (rocks < 10 ? "0" + std::to_string(rocks) : std::to_string(rocks));
+}
+
+void playGame(SOCKET s, GameState& game, sockaddr_in& opponentAddr) {
+    while (!isGameOver(game)) {
+        if (game.myTurn) {
+            std::cout << "1. Move\n2. Chat\n3. Forfeit\nChoice: ";
+            int choice;
+            std::cin >> choice;
+            std::cin.ignore();
+            std::string msg;
+            if (choice == 1) {
+                msg = getMove(game);
+                int pile = msg[0] - '0' - 1;
+                int rocks = std::stoi(msg.substr(1));
+                game.piles[pile] -= rocks;
+            }
+            else if (choice == 2) {
+                std::cout << "Message (max 80 chars): ";
+                std::getline(std::cin, msg);
+                msg = "C" + (msg.length() > 80 ? msg.substr(0, 80) : msg);
+            }
+            else if (choice == 3) {
+                sendMessage(s, "F", opponentAddr);
+                std::cout << "You forfeited. Game over.\n";
+                return;
+            }
+            else continue;
+            sendMessage(s, msg, opponentAddr);
+            if (choice == 1) {
+                if (isGameOver(game)) {
+                    std::cout << "You win!\n";
+                    return;
+                }
+                game.myTurn = false;
+            }
+        }
+        else {
+            std::string msg = receiveMessage(s, opponentAddr);
+            if (msg.empty()) {
+                std::cout << "Game over: No response. You win.\n";
+                return;
+            }
+            if (msg == "F") {
+                std::cout << game.opponentName << " forfeited. You win!\n";
+                return;
+            }
+            if (msg[0] == 'C') {
+                std::cout << game.opponentName << ": " << msg.substr(1) << "\n";
+                continue;
+            }
+            if (msg.length() != 3 || msg[0] < '1' || msg[0] - '0' > (int)game.piles.size() ||
+                std::stoi(msg.substr(1)) > game.piles[msg[0] - '0' - 1]) {
+                std::cout << "Game over: Invalid move. You win.\n";
+                return;
+            }
+            int pile = msg[0] - '0' - 1;
+            int rocks = std::stoi(msg.substr(1));
+            game.piles[pile] -= rocks;
+            if (isGameOver(game)) {
+                std::cout << game.opponentName << " wins.\n";
+                return;
+            }
+            game.myTurn = true;
+        }
+    }
+}
+
+// Main Function
+int main() {
+    initializeWinsock();
+    std::string userName = getUserName();
+    while (true) {
+        char choice = getModeChoice();
+        if (choice == 'Q') break;
+        SOCKET s = createUdpSocket();
+        GameState game;
+        sockaddr_in opponentAddr;
+        bool gameStarted = false;
+        if (choice == 'H') {
+            gameStarted = serverNegotiate(s, userName, game, opponentAddr);
+        }
+        else if (choice == 'C') {
+            gameStarted = clientNegotiate(s, userName, game, opponentAddr);
+        }
+        if (gameStarted) playGame(s, game, opponentAddr);
+        closesocket(s);
+        std::cout << "Play again? (y/n): ";
+        std::string again;
+        std::getline(std::cin, again);
+        if (again != "y" && again != "Y") break;
+    }
+    WSACleanup();
+    return 0;
+}
