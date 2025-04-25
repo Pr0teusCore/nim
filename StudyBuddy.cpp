@@ -347,12 +347,14 @@ void playGame(SOCKET s, GameState& game, sockaddr_in& opponentAddr) {
 int main() {
     initializeWinsock();
     std::string userName = getUserName();
-    while (true) {
-        char choice = getModeChoice();
-        if (choice == 'Q') break;
+
+    char choice = getModeChoice();
+
+    while (choice != 'Q') {
         SOCKET s = createUdpSocket();
         GameState game;
         sockaddr_in opponentAddr;
+
         bool gameStarted = false;
         if (choice == 'H') {
             gameStarted = serverNegotiate(s, userName, game, opponentAddr);
@@ -360,12 +362,11 @@ int main() {
         else if (choice == 'C') {
             gameStarted = clientNegotiate(s, userName, game, opponentAddr);
         }
+
         if (gameStarted) playGame(s, game, opponentAddr);
         closesocket(s);
-        std::cout << "Play again? (y/n): ";
-        std::string again;
-        std::getline(std::cin, again);
-        if (again != "y" && again != "Y") break;
+
+        choice = getModeChoice();
     }
     WSACleanup();
     return 0;
