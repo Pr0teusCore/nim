@@ -327,6 +327,10 @@ void playGame(SOCKET s, GameState& game, sockaddr_in& opponentAddr) {
                 std::cout << "Game over: Invalid move. You win.\n";
                 return;
             }
+            if (!isdigit(msg.substr(1))) {
+                std::cout <<  "Game over: Invalid move. You win.\n";
+                return;
+            }
             int pile = msg[0] - '0' - 1;
             int rocks = std::stoi(msg.substr(1));
             game.piles[pile] -= rocks;
