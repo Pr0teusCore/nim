@@ -101,7 +101,7 @@ int getServers(SOCKET s, ServerStruct servers[]) {
         int addrSize = sizeof(addr);
         int len = recvfrom(s, recvBuf, MAX_BUFFER, 0, (sockaddr*)&addr, &addrSize);
         if (len > 0 && strncmp(recvBuf, NAME_PREFIX, 5) == 0) {
-            strncpy(servers[numServers].name, recvBuf + 5, MAX_BUFFER - 5);
+            strncpy_s(servers[numServers].name, recvBuf + 5, MAX_BUFFER - 5);
             servers[numServers].name[MAX_BUFFER - 5] = '\0';
             servers[numServers].addr = addr;
             numServers++;
@@ -327,7 +327,7 @@ void playGame(SOCKET s, GameState& game, sockaddr_in& opponentAddr) {
                 std::cout << "Game over: Invalid move. You win.\n";
                 return;
             }
-            if (!isdigit(msg.substr(1))) {
+            if (!all_of(msg.substr(1).begin(), msg.substr(1).end(), ::isdigit)) {
                 std::cout <<  "Game over: Invalid move. You win.\n";
                 return;
             }
