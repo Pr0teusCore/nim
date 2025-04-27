@@ -40,4 +40,7 @@ struct GameState {
 int getServers(SOCKET s, ServerStruct server[]);
 int wait(SOCKET s, int seconds, int msec);
 sockaddr_in GetBroadcastAddress(char* IPAddress, char* subnetMask);
+int getServersUtilities(SOCKET s, ServerStruct server[]);
+int waitUtilities(SOCKET s, int seconds, int msec);
+sockaddr_in GetBroadcastAddressUtilities(char* IPAddress, char* subnetMask);
 sockaddr_in GetBroadcastAddressAlternate(char* IPAddress, char* subnetMask);
