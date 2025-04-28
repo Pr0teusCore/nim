@@ -192,11 +192,11 @@ bool clientNegotiate(SOCKET s, const std::string& clientName, GameState& game, s
         sendMessage(s, "GREAT!", serverAddr);
         // Recieve the game board from the server and ensure it is valid
         std::string board = receiveMessage(s, serverAddr);
-        if (board.empty() || board[0] < '3' || board[0] > '9' || board.length() != (board[0] - '0') * 2 + 1) {
+        if (board.empty() || board[0] < '3' || board[0] > '9' || board.length() != (board[0] - '0') * 2 + 1) { 
             std::cout << "Game over: Invalid/no board received. You win.\n";
             return false;
         }
-        // Something?
+        // ????? What is does this code do from 200-207 ?????
         game.piles.clear();
         for (size_t i = 1; i < board.length(); i += 2) {
             int rocks = std::stoi(board.substr(i, 2));
@@ -207,7 +207,7 @@ bool clientNegotiate(SOCKET s, const std::string& clientName, GameState& game, s
         return true;
     }
     
-    // If the server does accept the client's challenge we return
+    // If the server does not accept the client's challenge we return
     std::cout << game.opponentName << " refused the challenge.\n";
     return false;
 }
@@ -217,7 +217,7 @@ bool clientNegotiate(SOCKET s, const std::string& clientName, GameState& game, s
 
 bool serverNegotiate(SOCKET s, const std::string& serverName, GameState& game, sockaddr_in& clientAddr) {
     bindSocket(s, DEFAULT_PORT);
-    while (true) {
+    while (true) { // TODO: Put a control flag here for readability
         char buf[MAX_BUFFER];
         int addrSize = sizeof(clientAddr);
         if (wait(s, TIMEOUT_SECONDS, 0) > 0) {
@@ -233,16 +233,18 @@ bool serverNegotiate(SOCKET s, const std::string& serverName, GameState& game, s
                     std::cout << "Challenged by " << game.opponentName << ". Accept? (y/n): ";
                     std::string choice;
                     std::getline(std::cin, choice);
-                    if (choice == "y" || choice == "Y") { // EDIT: We can just use toupper() here since we do that for getModeChoice()
+                    if (choice == "y" || choice == "Y") { // !!!!!!!EDIT!!!!!!!: We can just use toupper() here since we do that for getModeChoice()
                         sendMessage(s, "YES", clientAddr);
                         std::string response = receiveMessage(s, clientAddr, GREAT_TIMEOUT);
                         if (response == "GREAT!") {
                             int piles;
+                            // Ask server to enter the number of piles. If they enter a number outside the range 3-9 ask them again
                             do {
                                 std::cout << "Enter number of piles (3-9): ";
                                 std::cin >> piles;
-                            } while (piles < 3 || piles > 9);
+                            } while (piles < 3 || piles > 9); 
                             game.piles.resize(piles);
+                            
                             for (int i = 0; i < piles; i++) {
                                 do {
                                     std::cout << "Enter rocks for pile " << i + 1 << " (1-20): ";
@@ -282,21 +284,29 @@ bool isGameOver(const GameState& game) {
 
 std::string getMove(const GameState& game) {
     int pile, rocks;
+    // !!!!!!!!EDIT!!!!!!!!!! I implemented a control flag that replaces the while true loop. Only issue is if user enters the amount of piles right but the rocks wrong then it will ask for both piles and rocks again.
+    // Could fix by implementing two seperate do while loops, but I am not sure about it.
+    bool validMove = true;
     do {
         displayBoard(game);
         std::cout << "Enter Pile to Take From (1-" << game.piles.size() << "): ";
         std::cin >> pile;
         if (pile < 1 || pile >(int)game.piles.size() || game.piles[pile - 1] == 0) {
             std::cout << "Invalid pile.\n";
-            continue;
+            //continue;
+            validMove = false;
         }
-        std::cout << "Enter Number of Rocks to Take (1-" << game.piles[pile - 1] << "): ";
-        std::cin >> rocks;
-        if (rocks < 1 || rocks > game.piles[pile - 1]) {
-            std::cout << "Invalid rocks.\n";
+        if(validMove) {
+            std::cout << "Enter Number of Rocks to Take (1-" << game.piles[pile - 1] << "): ";
+            std::cin >> rocks;
+            if (rocks < 1 || rocks > game.piles[pile - 1]) {
+                std::cout << "Invalid rocks.\n";
+                validMove = false;
+            }
         }
-        else break;
-    } while (true);
+        // else break;
+    } while (!validMove);
+    
     std::cin.ignore();
     return std::to_string(pile) + (rocks < 10 ? "0" + std::to_string(rocks) : std::to_string(rocks));
 }
