@@ -52,25 +52,6 @@ void bindSocket(SOCKET s, int port) {
     }
 }
 
-/*================================================================================*/
-// Wait Function (Adapted from StudyBuddy)
-
-//create async timer using <chrono> and <thread> that will wait for a specified time while waiting for messages on the socket
-void waitForMessage(SOCKET s, int seconds) {
-	fd_set readfds;
-	FD_ZERO(&readfds);
-	FD_SET(s, &readfds);
-	timeval timeout;
-	timeout.tv_sec = seconds;
-	timeout.tv_usec = 0;
-	int result = select(0, &readfds, NULL, NULL, &timeout);
-    if (result == SOCKET_ERROR) {
-		std::cout << "Select failed: " << WSAGetLastError() << std::endl;
-		closesocket(s);
-		WSACleanup();
-		exit(1);
-	}
-}
 
 /*================================================================================*/
 // Get Broadcast Address (Adapted from StudyBuddy)
@@ -191,6 +172,7 @@ bool clientNegotiate(SOCKET s, const std::string& clientName, GameState& game, s
     
     // If the server agrees to play we start the game
     if (response == "YES") {
+        cout << response << endl;
         sendMessage(s, "GREAT!", serverAddr);
         // Recieve the game board from the server and ensure it is valid
         std::string board = receiveMessage(s, serverAddr);
@@ -242,6 +224,7 @@ bool serverNegotiate(SOCKET s, const std::string& serverName, GameState& game, s
                         std::string response = receiveMessage(s, clientAddr, GREAT_TIMEOUT);
                         if (response == "GREAT!") {
                             // Ask server user to enter the number of piles. If they enter a number outside the range 3-9 ask them again
+                            cout << response << endl;
                             int piles;
                             do {
                                 std::cout << "Enter number of piles (3-9): ";
