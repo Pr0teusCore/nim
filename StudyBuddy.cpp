@@ -343,6 +343,7 @@ void playGame(SOCKET s, GameState& game, sockaddr_in& opponentAddr) {
         }
         else {
             std::string msg = receiveMessage(s, opponentAddr);
+            string rocksString = msg.substr(1);
             if (msg.empty()) {
                 std::cout << "Game over: No response. You win.\n";
                 return;
@@ -352,15 +353,15 @@ void playGame(SOCKET s, GameState& game, sockaddr_in& opponentAddr) {
                 return;
             }
             if (msg[0] == 'C') {
-                std::cout << game.opponentName << ": " << msg.substr(1) << "\n";
+                std::cout << game.opponentName << ": " << rocksString << "\n";
                 continue;
             }
             if (msg.length() != 3 || msg[0] < '1' || msg[0] - '0' > (int)game.piles.size() ||
-                std::stoi(msg.substr(1)) > game.piles[msg[0] - '0' - 1]) {
+                std::stoi(rocksString) > game.piles[msg[0] - '0' - 1]) {
                 std::cout << "Game over: Invalid move. You win.\n";
                 return;
             }
-            if (!all_of(msg.substr(1).begin(), msg.substr(1).end(), ::isdigit)) {
+            if (!all_of(rocksString.begin(), rocksString.end(), ::isdigit)) {
                 std::cout <<  "Game over: Invalid move. You win.\n";
                 return;
             }
