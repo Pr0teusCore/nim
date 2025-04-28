@@ -12,9 +12,9 @@
 #pragma comment(lib, "Ws2_32.lib")
 #pragma comment(lib, "iphlpapi.lib")
 
-
-
+/*================================================================================*/
 // Winsock Initialization
+
 void initializeWinsock() {
     WSADATA wsaData;
     if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
@@ -23,7 +23,9 @@ void initializeWinsock() {
     }
 }
 
+/*================================================================================*/
 // Socket Creation
+
 SOCKET createUdpSocket() {
     SOCKET s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (s == INVALID_SOCKET) {
@@ -34,7 +36,9 @@ SOCKET createUdpSocket() {
     return s;
 }
 
+/*================================================================================*/
 // Bind Socket
+
 void bindSocket(SOCKET s, int port) {
     sockaddr_in addr;
     addr.sin_family = AF_INET;
@@ -48,7 +52,9 @@ void bindSocket(SOCKET s, int port) {
     }
 }
 
+/*================================================================================*/
 // Wait Function (Adapted from StudyBuddy)
+
 int wait(SOCKET s, int seconds, int msec) {
     struct timeval timeout;
     timeout.tv_sec = seconds;
@@ -64,8 +70,9 @@ int wait(SOCKET s, int seconds, int msec) {
     }
     return stat;
 }
-
+/*================================================================================*/
 // Get Broadcast Address (Adapted from StudyBuddy)
+
 sockaddr_in GetBroadcastAddress() {
     PIP_ADAPTER_INFO pAdapterInfo = (IP_ADAPTER_INFO*)HeapAlloc(GetProcessHeap(), 0, sizeof(IP_ADAPTER_INFO));
     ULONG ulOutBufLen = sizeof(IP_ADAPTER_INFO);
@@ -86,8 +93,9 @@ sockaddr_in GetBroadcastAddress() {
     if (pAdapterInfo) HeapFree(GetProcessHeap(), 0, pAdapterInfo);
     return addr.sin_addr.s_addr == INADDR_ANY ? addr : addr; // Fallback to 255.255.255.255 if needed
 }
-
+/*================================================================================*/
 // Discover Servers (Adapted from StudyBuddy)
+
 int getServers(SOCKET s, ServerStruct servers[]) {
     int numServers = 0;
     BOOL bOptVal = TRUE;
@@ -110,13 +118,16 @@ int getServers(SOCKET s, ServerStruct servers[]) {
     }
     return numServers;
 }
-
+/*================================================================================*/
 // Send Message
+
 void sendMessage(SOCKET s, const std::string& message, sockaddr_in dest) {
     sendto(s, message.c_str(), message.length() + 1, 0, (sockaddr*)&dest, sizeof(dest));
 }
 
+/*================================================================================*/
 // Receive Message
+
 std::string receiveMessage(SOCKET s, sockaddr_in& sender, int seconds = TIMEOUT_SECONDS) {
     char buf[MAX_BUFFER];
     int senderLen = sizeof(sender);
@@ -129,8 +140,9 @@ std::string receiveMessage(SOCKET s, sockaddr_in& sender, int seconds = TIMEOUT_
     }
     return "";
 }
-
+/*================================================================================*/
 // User Input Functions
+
 std::string getUserName() {
     std::cout << "Enter your name (max 80 chars): ";
     std::string name;
@@ -145,14 +157,19 @@ char getModeChoice() {
     return toupper(choice);
 }
 
+/*================================================================================*/
 // Client Negotiation
+
 bool clientNegotiate(SOCKET s, const std::string& clientName, GameState& game, sockaddr_in& serverAddr) {
+    // Fetch servers
     ServerStruct servers[MAX_SERVERS];
     int numServers = getServers(s, servers);
     if (numServers == 0) {
         std::cout << "No servers found.\n";
         return false;
     }
+    
+    // Give client the option to pick a server to challenge
     std::cout << "Available servers:\n";
     for (int i = 0; i < numServers; i++) {
         std::cout << i + 1 << ". " << servers[i].name << "\n";
@@ -162,19 +179,24 @@ bool clientNegotiate(SOCKET s, const std::string& clientName, GameState& game, s
     std::cin >> choice;
     std::cin.ignore();
     if (choice < 1 || choice > numServers) return false;
+    
+    // Notify the server that the client picked to challenge
     serverAddr = servers[choice - 1].addr;
     game.opponentName = servers[choice - 1].name;
-
     std::string challenge = PLAYER_PREFIX + clientName;
     sendMessage(s, challenge, serverAddr);
     std::string response = receiveMessage(s, serverAddr, CHALLENGE_TIMEOUT);
+    
+    // If the server agrees to play we start the game
     if (response == "YES") {
         sendMessage(s, "GREAT!", serverAddr);
+        // Recieve the game board from the server and ensure it is valid
         std::string board = receiveMessage(s, serverAddr);
         if (board.empty() || board[0] < '3' || board[0] > '9' || board.length() != (board[0] - '0') * 2 + 1) {
             std::cout << "Game over: Invalid/no board received. You win.\n";
             return false;
         }
+        // Something?
         game.piles.clear();
         for (size_t i = 1; i < board.length(); i += 2) {
             int rocks = std::stoi(board.substr(i, 2));
@@ -184,11 +206,15 @@ bool clientNegotiate(SOCKET s, const std::string& clientName, GameState& game, s
         game.myTurn = true;
         return true;
     }
+    
+    // If the server does accept the client's challenge we return
     std::cout << game.opponentName << " refused the challenge.\n";
     return false;
 }
 
+/*================================================================================*/
 // Server Negotiation
+
 bool serverNegotiate(SOCKET s, const std::string& serverName, GameState& game, sockaddr_in& clientAddr) {
     bindSocket(s, DEFAULT_PORT);
     while (true) {
@@ -207,7 +233,7 @@ bool serverNegotiate(SOCKET s, const std::string& serverName, GameState& game, s
                     std::cout << "Challenged by " << game.opponentName << ". Accept? (y/n): ";
                     std::string choice;
                     std::getline(std::cin, choice);
-                    if (choice == "y" || choice == "Y") {
+                    if (choice == "y" || choice == "Y") { // EDIT: We can just use toupper() here since we do that for getModeChoice()
                         sendMessage(s, "YES", clientAddr);
                         std::string response = receiveMessage(s, clientAddr, GREAT_TIMEOUT);
                         if (response == "GREAT!") {
@@ -240,8 +266,9 @@ bool serverNegotiate(SOCKET s, const std::string& serverName, GameState& game, s
     }
     return false;
 }
-
+/*================================================================================*/
 // Game Logic
+
 void displayBoard(const GameState& game) {
     std::cout << "Board:\n";
     for (size_t i = 0; i < game.piles.size(); i++) {
@@ -343,7 +370,9 @@ void playGame(SOCKET s, GameState& game, sockaddr_in& opponentAddr) {
     }
 }
 
+/*================================================================================*/
 // Main Function
+
 int main() {
     initializeWinsock();
     std::string userName = getUserName();
