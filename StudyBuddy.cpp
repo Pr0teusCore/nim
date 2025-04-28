@@ -286,12 +286,18 @@ std::string getMove(const GameState& game) {
             //continue;
             validMove = false;
         }
+        else {
+            validMove = true;
+        }
         if(validMove) {
             std::cout << "Enter Number of Rocks to Take (1-" << game.piles[pile - 1] << "): ";
             std::cin >> rocks;
             if (rocks < 1 || rocks > game.piles[pile - 1]) {
                 std::cout << "Invalid rocks.\n";
                 validMove = false;
+            }
+            else {
+                validMove = true;
             }
         }
         // else break;
