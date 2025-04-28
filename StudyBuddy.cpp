@@ -224,33 +224,38 @@ bool serverNegotiate(SOCKET s, const std::string& serverName, GameState& game, s
             int len = recvfrom(s, buf, MAX_BUFFER, 0, (sockaddr*)&clientAddr, &addrSize);
             if (len > 0) {
                 buf[len] = '\0';
+                // Check if the client asked the server "Who?"
                 if (strcmp(buf, QUERY) == 0) {
                     std::string response = NAME_PREFIX + serverName;
                     sendMessage(s, response, clientAddr);
-                }
-                else if (strncmp(buf, PLAYER_PREFIX, 7) == 0) {
+                } 
+                else if (strncmp(buf, PLAYER_PREFIX, 7) == 0) { // Check if the client sent the challenge message "Player=client_name"
                     game.opponentName = std::string(buf + 7);
                     std::cout << "Challenged by " << game.opponentName << ". Accept? (y/n): ";
                     std::string choice;
                     std::getline(std::cin, choice);
+                    // Check if the server user accepted the challenge and respond to client
                     if (choice == "y" || choice == "Y") { // !!!!!!!EDIT!!!!!!!: We can just use toupper() here since we do that for getModeChoice()
                         sendMessage(s, "YES", clientAddr);
                         std::string response = receiveMessage(s, clientAddr, GREAT_TIMEOUT);
                         if (response == "GREAT!") {
+                            // Ask server user to enter the number of piles. If they enter a number outside the range 3-9 ask them again
                             int piles;
-                            // Ask server to enter the number of piles. If they enter a number outside the range 3-9 ask them again
                             do {
                                 std::cout << "Enter number of piles (3-9): ";
                                 std::cin >> piles;
                             } while (piles < 3 || piles > 9); 
                             game.piles.resize(piles);
                             
+                            // Ask server user to enter the number of rocks for each pile
                             for (int i = 0; i < piles; i++) {
                                 do {
                                     std::cout << "Enter rocks for pile " << i + 1 << " (1-20): ";
                                     std::cin >> game.piles[i];
                                 } while (game.piles[i] < 1 || game.piles[i] > 20);
                             }
+                            
+                            // Send the game board to the client
                             std::cin.ignore();
                             std::string board = std::to_string(piles);
                             for (int r : game.piles) board += (r < 10 ? "0" + std::to_string(r) : std::to_string(r));
@@ -259,7 +264,7 @@ bool serverNegotiate(SOCKET s, const std::string& serverName, GameState& game, s
                             return true;
                         }
                     }
-                    else {
+                    else { // The server user declines the challenge
                         sendMessage(s, "NO", clientAddr);
                     }
                 }
