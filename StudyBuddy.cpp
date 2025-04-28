@@ -366,7 +366,7 @@ void playGame(SOCKET s, GameState& game, sockaddr_in& opponentAddr) {
                 return;
             }
             int pile = msg[0] - '0' - 1;
-            int rocks = std::stoi(msg.substr(1));
+            int rocks = std::stoi(rocksString);
             game.piles[pile] -= rocks;
             if (isGameOver(game)) {
                 std::cout << game.opponentName << " wins.\n";
