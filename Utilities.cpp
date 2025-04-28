@@ -47,7 +47,7 @@ int getServersUtilities(SOCKET s, ServerStruct server[])
 	return numServers;
 }
 
-int waitUtilities(SOCKET s, int seconds, int msec) {
+int wait(SOCKET s, int seconds, int msec) {
 	// Parameter List:
 	// [IN] s		: SOCKET handle
 	// [IN] seconds : Number of seconds to wait for incoming traffic
