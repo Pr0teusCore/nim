@@ -341,7 +341,7 @@ void playGame(SOCKET s, GameState& game, sockaddr_in& opponentAddr) {
                 std::cout << "Game over: No response. You win.\n";
                 return;
             }
-            if (msg == "F") {
+            if (msg[0] == 'F') {
                 std::cout << game.opponentName << " forfeited. You win!\n";
                 return;
             }
