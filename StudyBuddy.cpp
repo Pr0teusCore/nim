@@ -55,21 +55,23 @@ void bindSocket(SOCKET s, int port) {
 /*================================================================================*/
 // Wait Function (Adapted from StudyBuddy)
 
-int wait(SOCKET s, int seconds, int msec) {
-    struct timeval timeout;
-    timeout.tv_sec = seconds;
-    timeout.tv_usec = msec * 1000;
-    fd_set readFDS, xcptFDS;
-    FD_ZERO(&readFDS);
-    FD_ZERO(&xcptFDS);
-    FD_SET(s, &readFDS);
-    FD_SET(s, &xcptFDS);
-    int stat = select(0, &readFDS, NULL, &xcptFDS, &timeout);
-    if (stat == SOCKET_ERROR || (stat > 0 && (FD_ISSET(s, &xcptFDS) || !FD_ISSET(s, &readFDS)))) {
-        return 0;
-    }
-    return stat;
+//create async timer using <chrono> and <thread> that will wait for a specified time while waiting for messages on the socket
+void waitForMessage(SOCKET s, int seconds) {
+	fd_set readfds;
+	FD_ZERO(&readfds);
+	FD_SET(s, &readfds);
+	timeval timeout;
+	timeout.tv_sec = seconds;
+	timeout.tv_usec = 0;
+	int result = select(0, &readfds, NULL, NULL, &timeout);
+    if (result == SOCKET_ERROR) {
+		std::cout << "Select failed: " << WSAGetLastError() << std::endl;
+		closesocket(s);
+		WSACleanup();
+		exit(1);
+	}
 }
+
 /*================================================================================*/
 // Get Broadcast Address (Adapted from StudyBuddy)
 
