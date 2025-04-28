@@ -6,7 +6,7 @@
 
 #pragma comment (lib, "iphlpapi.lib")
 
-int getServers(SOCKET s, ServerStruct server[])
+int getServersUtilities(SOCKET s, ServerStruct server[])
 {
 	// Parameter List:
 	// [IN] s				 : SOCKET handle 
@@ -19,9 +19,9 @@ int getServers(SOCKET s, ServerStruct server[])
 	BOOL bOptVal = TRUE;
 	setsockopt(s, SOL_SOCKET, SO_BROADCAST, (char*)&bOptVal, sizeof(BOOL));
 
-	sockaddr_in broadcastAddress = GetBroadcastAddress(IPAddress, subnetMask);
+	sockaddr_in broadcastAddress = GetBroadcastAddressUtilities(IPAddress, subnetMask);
 
-	int iResult = sendto(s, Study_QUERY, strlen(Study_QUERY) + 1, 0, (sockaddr*)&broadcastAddress, sizeof(broadcastAddress));
+	int iResult = sendto(s, QUERY, strlen(QUERY) + 1, 0, (sockaddr*)&broadcastAddress, sizeof(broadcastAddress));
 	char recvBuf[DEFAULT_BUFLEN];
 
 	int status = wait(s, 2, 0);
@@ -47,7 +47,7 @@ int getServers(SOCKET s, ServerStruct server[])
 	return numServers;
 }
 
-int wait(SOCKET s, int seconds, int msec) {
+int waitUtilities(SOCKET s, int seconds, int msec) {
 	// Parameter List:
 	// [IN] s		: SOCKET handle
 	// [IN] seconds : Number of seconds to wait for incoming traffic
@@ -83,7 +83,7 @@ int wait(SOCKET s, int seconds, int msec) {
 	return stat;
 }
 
-sockaddr_in GetBroadcastAddress(char* ip, char* mask)
+sockaddr_in GetBroadcastAddressUtilities(char* ip, char* mask)
 {
 	// NOTE: This code only returns the broadcast address for the first adapter found.
 	// Alternate function gets IP address and subnet mask from user to ensure valid
