@@ -311,29 +311,29 @@ void playGame(SOCKET s, GameState& game, sockaddr_in& opponentAddr) {
     while (!isGameOver(game)) {
         if (game.myTurn) {
             std::cout << "1. Move\n2. Chat\n3. Forfeit\nEnter Number: ";
-            int choice;
+            char choice;
             std::cin >> choice;
             std::cin.ignore();
             std::string msg;
-            if (choice == 1) {
+            if (choice - '0' == 1) {
                 msg = getMove(game);
                 int pile = msg[0] - '0' - 1;
                 int rocks = std::stoi(msg.substr(1));
                 game.piles[pile] -= rocks;
             }
-            else if (choice == 2) {
+            else if (choice - '0' == 2) {
                 std::cout << "Enter Message (max 80 chars): ";
                 std::getline(std::cin, msg);
                 msg = "C" + (msg.length() > 80 ? msg.substr(0, 80) : msg);
             }
-            else if (choice == 3) {
+            else if (choice - '0' == 3) {
                 sendMessage(s, "F", opponentAddr);
                 std::cout << "You forfeited. Game over.\n";
                 return;
             }
             else continue;
             sendMessage(s, msg, opponentAddr);
-            if (choice == 1) {
+            if (choice - '0' == 1) {
                 if (isGameOver(game)) {
                     std::cout << "You win!\n";
                     return;
