@@ -157,7 +157,7 @@ bool clientNegotiate(SOCKET s, const std::string& clientName, GameState& game, s
     for (int i = 0; i < numServers; i++) {
         std::cout << i + 1 << ". " << servers[i].name << "\n";
     }
-    std::cout << "Select a server (1-" << numServers << "): ";
+    std::cout << std::endl << "Select a server (1-" << numServers << "): ";
     int choice;
     std::cin >> choice;
     std::cin.ignore();
@@ -177,7 +177,7 @@ bool clientNegotiate(SOCKET s, const std::string& clientName, GameState& game, s
         // Recieve the game board from the server and ensure it is valid
         std::string board = receiveMessage(s, serverAddr);
         if (board.empty() || board[0] < '3' || board[0] > '9' || board.length() != (board[0] - '0') * 2 + 1) { 
-            std::cout << "Game over: Invalid/no board received. You win.\n";
+            std::cout << std::endl << "Game over: Invalid/no board received. You win.\n";
             return false;
         }
         // ????? What is does this code do from 200-207 ?????
@@ -201,7 +201,7 @@ bool clientNegotiate(SOCKET s, const std::string& clientName, GameState& game, s
 
 bool serverNegotiate(SOCKET s, const std::string& serverName, GameState& game, sockaddr_in& clientAddr) {
     bindSocket(s, DEFAULT_PORT);
-    while (true) { // TODO: Put a control flag here for readability
+    while (true) { 
         char buf[MAX_BUFFER];
         int addrSize = sizeof(clientAddr);
         if (wait(s, TIMEOUT_SECONDS, 0) > 0) {
@@ -215,7 +215,7 @@ bool serverNegotiate(SOCKET s, const std::string& serverName, GameState& game, s
                 } 
                 else if (strncmp(buf, PLAYER_PREFIX, 7) == 0) { // Check if the client sent the challenge message "Player=client_name"
                     game.opponentName = std::string(buf + 7);
-                    std::cout << "Challenged by " << game.opponentName << ". Accept? (y/n): ";
+                    std::cout << std::endl << "Challenged by " << game.opponentName << ". Accept? (y/n): ";
                     std::string choice;
                     std::cin.ignore();
                     std::getline(std::cin, choice);
@@ -232,7 +232,7 @@ bool serverNegotiate(SOCKET s, const std::string& serverName, GameState& game, s
                                 std::cin >> piles;
                             } while (piles < 3 || piles > 9); 
                             game.piles.resize(piles);
-                            
+                            std::cout << std::endl;
                             // Ask server user to enter the number of rocks for each pile
                             for (int i = 0; i < piles; i++) {
                                 do {
@@ -240,7 +240,7 @@ bool serverNegotiate(SOCKET s, const std::string& serverName, GameState& game, s
                                     std::cin >> game.piles[i];
                                 } while (game.piles[i] < 1 || game.piles[i] > 20);
                             }
-                            
+                            std::cout << std::endl;
                             // Send the game board to the client
                             std::cin.ignore();
                             std::string board = std::to_string(piles);
@@ -263,7 +263,7 @@ bool serverNegotiate(SOCKET s, const std::string& serverName, GameState& game, s
 // Game Logic
 
 void displayBoard(const GameState& game) {
-    std::cout << "Board:\n";
+    std::cout << std::endl << "Board:\n";
     for (size_t i = 0; i < game.piles.size(); i++) {
         std::cout << "Pile " << i + 1 << ": " << game.piles[i] << "\n";
     }
@@ -275,12 +275,10 @@ bool isGameOver(const GameState& game) {
 
 std::string getMove(const GameState& game) {
     int pile, rocks;
-    // !!!!!!!!EDIT!!!!!!!!!! I implemented a control flag that replaces the while true loop. Only issue is if user enters the amount of piles right but the rocks wrong then it will ask for both piles and rocks again.
-    // Could fix by implementing two seperate do while loops, but I am not sure about it.
     bool validMove = true;
     do {
         displayBoard(game);
-        std::cout << "Enter Pile to Take From (1-" << game.piles.size() << "): ";
+        std::cout << std::endl << "Enter Pile to Take From (1-" << game.piles.size() << "): ";
         std::cin >> pile;
         if (pile < 1 || pile >(int)game.piles.size() || game.piles[pile - 1] == 0) {
             std::cout << "Invalid pile.\n";
@@ -291,7 +289,7 @@ std::string getMove(const GameState& game) {
             validMove = true;
         }
         if(validMove) {
-            std::cout << "Enter Number of Rocks to Take (1-" << game.piles[pile - 1] << "): ";
+            std::cout << std::endl << "Enter Number of Rocks to Take (1-" << game.piles[pile - 1] << "): ";
             std::cin >> rocks;
             if (rocks < 1 || rocks > game.piles[pile - 1]) {
                 std::cout << "Invalid rocks.\n";
@@ -311,12 +309,13 @@ std::string getMove(const GameState& game) {
 void playGame(SOCKET s, GameState& game, sockaddr_in& opponentAddr) {
     while (!isGameOver(game)) {
         if (game.myTurn) {
+            std::cout << "Make Your Move:" << std::endl << "----------------" << std::endl;
             std::cout << "1. Move\n2. Chat\n3. Forfeit\nEnter Number: ";
             string choice;
             std::cin >> choice;
             std::string msg;
             if (choice.length() > 1) {
-                std::cout << "Invalid Option. Enter 1-3." << endl;
+                std::cout << "Invalid Option. Enter 1-3." << std::endl;
                 continue;
             }
             if (choice[0] - '0' == 1) {
@@ -336,7 +335,7 @@ void playGame(SOCKET s, GameState& game, sockaddr_in& opponentAddr) {
                 return;
             }
             else {
-                std::cout << "Invalid Option. Enter 1-3." << endl;
+                std::cout << "Invalid Option. Enter 1-3." << std::endl;
                 continue;
             }
             sendMessage(s, msg, opponentAddr);
