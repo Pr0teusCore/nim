@@ -217,6 +217,7 @@ bool serverNegotiate(SOCKET s, const std::string& serverName, GameState& game, s
                     game.opponentName = std::string(buf + 7);
                     std::cout << "Challenged by " << game.opponentName << ". Accept? (y/n): ";
                     std::string choice;
+                    std::cin.ignore();
                     std::getline(std::cin, choice);
                     // Check if the server user accepted the challenge and respond to client
                     if (choice == "y" || choice == "Y") { // !!!!!!!EDIT!!!!!!!: We can just use toupper() here since we do that for getModeChoice()
